@@ -1,0 +1,65 @@
+import logging
+from telegram import Update
+from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+import requests
+import os
+
+# Configuração do logging
+logging.basicConfig(
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    level=logging.INFO
+)
+
+# Tokens e chaves da API (do ambiente)
+API_TOKEN = os.getenv("API_TOKEN")
+API_FOOTBALL_KEY = os.getenv("API_FOOTBALL_KEY")
+
+# Função de boas-vindas
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Bem-vindo ao bot de futebol! Use /palpites ou /estatisticas.")
+
+# Comando de palpites
+async def palpites(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    url = "https://v3.football.api-sports.io/predictions?fixture=198772"
+    headers = {
+        "x-apisports-key": API_FOOTBALL_KEY
+    }
+
+    response = requests.get(url, headers=headers)
+    data = response.json()
+
+    try:
+        prediction = data["response"][0]["predictions"]["winner"]["name"]
+        advice = data["response"][0]["predictions"]["advice"]
+        await update.message.reply_text(f"Palpite: {prediction}\nDica: {advice}")
+    except (IndexError, KeyError):
+        await update.message.reply_text("Não foi possível obter o palpite no momento.")
+
+# Comando de estatísticas
+async def estatisticas(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    url = "https://v3.football.api-sports.io/fixtures/statistics?fixture=198772&team=33"
+    headers = {
+        "x-apisports-key": API_FOOTBALL_KEY
+    }
+
+    response = requests.get(url, headers=headers)
+    data = response.json()
+
+    try:
+        stats = data["response"][0]["statistics"]
+        mensagem = "Estatísticas do time:\n"
+        for stat in stats:
+            mensagem += f"{stat['type']}: {stat['value']}\n"
+        await update.message.reply_text(mensagem)
+    except (IndexError, KeyError):
+        await update.message.reply_text("Não foi possível obter as estatísticas no momento.")
+
+# Inicialização do bot
+if __name__ == '__main__':
+    app = ApplicationBuilder().token(API_TOKEN).build()
+
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("palpites", palpites))
+    app.add_handler(CommandHandler("estatisticas", estatisticas))
+
+    app.run_polling()
